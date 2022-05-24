@@ -19,7 +19,8 @@ to count how many rows to skip, and modify that on line 33 in the script**
 
 @author: Anthony.R.Klemm
 """
-
+import re
+import fnmatch
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -28,10 +29,15 @@ from IPython import get_ipython
 get_ipython().run_line_magic('matplotlib', 'qt')
 
 wkdir_path = "C:/Users/Anthony.R.Klemm/Desktop/"
-filename = "lostmans.txt"
+filename = "louisiana.txt"
 file_input=wkdir_path+filename
+
 #read waterlevel tide file from USGS in pandas
-df = pd.read_csv(file_input, skiprows=(34), sep = "\t", low_memory=False)
+try:
+    df = pd.read_csv(file_input, skiprows=27, sep = "\t", low_memory=False)
+except:
+    print('error skipping 27 rows of header, trying to skip 34 rows')
+    df = pd.read_csv(file_input, skiprows=34, sep = "\t", low_memory=False)  
 df = df.iloc[1: , :]
 for columns in df:
     try:
@@ -58,9 +64,12 @@ for columns in df:
     try:
         df.rename(columns={"170228_00065":"147223_62620"}, inplace=True)
         df.rename(columns={"62944_00065":"147223_62620"}, inplace=True)
+        df.rename(columns={"31396_00065":"147223_62620"}, inplace=True)
+        df.rename(columns={"170484_00065":"147223_62620"}, inplace=True)
+        df.rename(columns={'171073_00065':"147223_62620"}, inplace=True)
+        df.rename(columns={'171228_00065':"147223_62620"}, inplace=True)
     except KeyError:
         continue
-print(df.head())
 
 #define timestamp as datetime format
 format = '%Y-%m-%d %H:%M:%S'
@@ -68,7 +77,6 @@ df['datetime'] = pd.to_datetime(df['datetime'], format=format)
 
 #create datetime index allowing data resample for minimum daily waterlevel
 df = df.set_index(pd.DatetimeIndex(df['datetime']))
-print(df.dtypes)
 df['147223_62620'] = df['147223_62620'].astype('float')
 
 g = df.resample('D')['147223_62620']
@@ -80,6 +88,7 @@ df = df.groupby(df.index.date).apply(lambda x: x.iloc[[0]])
 
 df.index = df.index.droplevel(0)
 #create 90 day rolling average
+#df['90day_avg'] = df.min_daily_watlev.rolling(90).mean().shift(-45)
 df['90day_avg'] = df.min_daily_watlev.rolling(90).mean().shift(-45)
 df['total_avg'] = df.min_daily_watlev.mean()
 
@@ -106,8 +115,9 @@ df5 = df5[0]
 df5 = str(round(df5,3))
 
 #print the results in the IPython console
-print('Average Minimum Waterlevel = ' + df2 + ' std_dev = ' + df3)
-print('Filtered Min Watlev = ' + df4 + ' std_dev = ' + df5)
+print('Analysis complete for ' + filename[:-4] + ' water level gauge')
+print('Average Minimum Waterlevel (AKA NAVD88 to MLLW SEP value) = ' + df2 + 'm std_dev = ' + df3 + 'm')
+print('90-day rolling average (Filtered) Min Watlev = ' + df4 + 'm std_dev = ' + df5 + 'm')
 
 #create the graph
 x = df['datetime']
